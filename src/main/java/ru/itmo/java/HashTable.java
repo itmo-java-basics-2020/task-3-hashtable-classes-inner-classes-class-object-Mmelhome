@@ -1,8 +1,6 @@
 package ru.itmo.java;
 
-import java.security.KeyStore;
-import java.util.Map;
-
+import static java.lang.Math.abs;
 
 public class HashTable {
 
@@ -13,37 +11,56 @@ public class HashTable {
     private int initialCapacity;
 
     private int size = 0;
-    private int realsize = 0;
+    private int realSize = 0;
 
-    HashTable(int initialCapacity, float loadFactor){
-        this.initialCapacity = initialCapacity;
-        this.loadFactor = loadFactor;
-        this.threshold = (int)loadFactor * initialCapacity;
-        this.F = new Entry[initialCapacity];
-    }
-    HashTable(int initialCapacity){
-        this.initialCapacity = initialCapacity;
-        this.threshold = (int)this.loadFactor * initialCapacity;
-        this.F = new Entry[initialCapacity];
-    }
-
-    private static class Entry{
+    private static class Entry {
         private Object key;
         private Object value;
-        boolean dead = false;
+        private boolean deleted = false;
 
-        Entry(Object key, Object value){
+        private Entry(Object key, Object value) {
             this.key = key;
             this.value = value;
         }
-        Entry(Object key){
-            this.key = key;
-            this.value = null;
+
+        public Object getKey() {
+            return key;
+        }
+
+        public Object getValue() {
+            return value;
         }
     }
 
-    private int HashFunc(Entry entry){
-        return Math.abs(entry.key.hashCode() % this.initialCapacity);
+    HashTable(int initialCapacity) {
+        this.initialCapacity = initialCapacity;
+        threshold = (int) (initialCapacity * loadFactor);
+        F = new Entry[initialCapacity];
+    }
+
+    HashTable(int initialCapacity, float loadFactor) {
+        this.loadFactor = loadFactor;
+        this.initialCapacity = initialCapacity;
+        threshold = (int) (initialCapacity * loadFactor);
+        F = new Entry[initialCapacity];
+    }
+
+    private int getHash(Object key) {
+        return Math.abs(key.hashCode() % F.length);
+    }
+
+    private int search(Object key, boolean findDeleted) {
+        int hash = getHash(key);
+
+        while (true) {
+            if (F[hash] == null) {
+                return hash;
+            } else if (F[hash].getKey().equals(key) && (!F[hash].deleted || findDeleted)) {
+                return hash;
+            }
+
+            hash = (hash + 1) % this.initialCapacity;
+        }
     }
 
     private void resize() {
@@ -52,81 +69,63 @@ public class HashTable {
         initialCapacity *= 2;
         threshold = (int) (initialCapacity * loadFactor);
         size = 0;
-        realsize = 0;
+        realSize = 0;
 
         F = new Entry[initialCapacity];
 
         for (Entry entry : oldEntry) {
-            if (entry != null && !entry.dead) {
-                put(entry.key, entry.value);
+            if (entry != null && !entry.deleted) {
+                put(entry.getKey(), entry.getValue());
             }
         }
-
     }
-
 
     Object put(Object key, Object value) {
-        var entry = new Entry(key, value);
-        var hash = HashFunc(entry);
-        while (true) {
-            if (F[hash] == null) {
-                F[hash] = entry;
-                this.size++;
-                this.realsize++;
+        int hash = search(key, true);
 
-                if (realsize >= threshold) {
-                    resize();
-                }
+        if (F[hash] == null) {
+            F[hash] = new Entry(key, value);
+            size++;
+            realSize++;
 
-                return null;
+            if (realSize == threshold) {
+                resize();
             }
-            else if(F[hash].dead){
-                F[hash] = entry;
-                this.size++;
-                return null;
-            }
-            else if (F[hash].key.equals(entry.key)) {
-                Object Value = F[hash].value;
-                F[hash] = entry;
-                return Value;
-            }
-            hash = (hash + 1) % this.initialCapacity;
+
+            return null;
+        } else if (F[hash].deleted) {
+            F[hash] = new Entry(key, value);
+            size++;
+            return null;
+        } else {
+            Object Value = F[hash].getValue();
+            F[hash] = new Entry(key, value);
+            return Value;
         }
     }
 
-
     Object get(Object key) {
-        var hash = HashFunc(new Entry(key));
-        var deadhash = hash;
-        while (true) {
-            if (F[hash] != null && F[hash].key.equals(key) && !F[hash].dead) {
-                return F[hash].value;
-            }
-            hash = (hash + 1) % this.initialCapacity;
-            if (hash == deadhash){
-                return null;
-            }
+        int hash = search(key, false);
+
+        if (F[hash] != null){
+            return F[hash].getValue();
         }
+        return null;
     }
 
     Object remove(Object key) {
-        var hash = HashFunc(new Entry(key));
-        var deadhash = hash;
-        while (true) {
-            if (F[hash] != null && F[hash].key.equals(key)) {
-                F[hash].dead = true;
-                this.size--;
-                return F[hash].value;
-            }
-            hash = (hash + 1) % this.initialCapacity;
-            if (hash == deadhash){
-                return null;
-            }
+        int hash = search(key, false);
+
+        if (F[hash] != null) {
+            F[hash].deleted = true;
+            size--;
+            return F[hash].getValue();
         }
+
+        return null;
     }
 
     int size() {
         return size;
     }
-
 }
