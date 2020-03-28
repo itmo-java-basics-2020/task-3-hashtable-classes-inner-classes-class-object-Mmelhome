@@ -35,6 +35,7 @@ public class HashTable {
         Entry[] oldEntry = entry;
 
         initialCapacity *= 2;
+        //без каста выдаёт ошибку
         threshold = (int) (initialCapacity * loadFactor);
         size = 0;
         realSize = 0;
@@ -69,7 +70,7 @@ public class HashTable {
             size++;
             realSize++;
 
-            if (realSize == threshold) {
+            if (realSize >= threshold) {
                 resize();
             }
 
